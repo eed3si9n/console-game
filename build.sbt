@@ -7,6 +7,5 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 lazy val root = (project in file("."))
   .settings(
     name := "console-game",
-    libraryDependencies += jansi,
-    libraryDependencies += scalaTest % Test
+    libraryDependencies ++= List(jansi, jline3),
   )
