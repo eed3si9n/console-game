@@ -11,7 +11,7 @@ object ConsoleGame extends App {
   val isGameOn = new AtomicBoolean(true)
   val keyPressses = new ArrayBlockingQueue[Either[Operation, String]](128)
   case class GameState(pos: (Int, Int))
-  var gameState: GameState = GameState(pos = (6, 4))
+  var gameState: GameState = GameState(pos = (6, 7))
 
   AnsiConsole.out.println(Draw.eraseScreen.run(Ansi.ansi())._1)
 
@@ -31,6 +31,8 @@ object ConsoleGame extends App {
     }
   }
 
+  var tick: Int = 0
+
   // inside the main thread
   while (isGameOn.get) {
     while (!keyPressses.isEmpty) {
@@ -38,8 +40,20 @@ object ConsoleGame extends App {
         gameState = handleKeypress(k, gameState)
       }
     }
+    tick += 1
+    if (tick % 10 == 0) {
+      info("something ".concat(tick.toString))
+    }
     drawGame(gameState)
     Thread.sleep(100)
+  }
+
+  def info(msg: String): Unit = {
+    AnsiConsole.out.println(Ansi.ansi()
+      .cursor(5, 0)
+      .scrollUp(1)
+      .eraseLine()
+      .a(msg))
   }
 
   def handleKeypress(k: Either[Operation, String], g: GameState): GameState =
@@ -70,7 +84,7 @@ object ConsoleGame extends App {
   def drawGame(g: GameState): Unit = {
     val drawing: BuilderHelper[Ansi, Unit] =
       for {
-        _ <- Draw.drawBox(2, 2, 20, 10)
+        _ <- Draw.drawBox(2, 6, 20, 6)
         _ <- Draw.drawBlock(g.pos._1, g.pos._2)
         _ <- Draw.drawText(2, 12, "press 'q' to quit")
       } yield ()
