@@ -2,14 +2,14 @@ package example
 
 import org.fusesource.jansi.{ AnsiConsole, Ansi }
 import jline.console.{ ConsoleReader, KeyMap, Operation }
-import scala.concurrent.{ Future, ExecutionContext }
+import scala.concurrent.{ blocking, Future, ExecutionContext }
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ArrayBlockingQueue
 
 object ConsoleGame extends App {
   val reader = new ConsoleReader()
   val isGameOn = new AtomicBoolean(true)
-  val keyPressses = new ConcurrentLinkedQueue[Either[Operation, String]]()
+  val keyPressses = new ArrayBlockingQueue[Either[Operation, String]](128)
   case class GameState(pos: (Int, Int))
   var gameState: GameState = GameState(pos = (6, 4))
 
@@ -17,17 +17,21 @@ object ConsoleGame extends App {
 
   import ExecutionContext.Implicits._
 
+  // inside a background thread
   val inputHandling = Future {
     val km = KeyMap.keyMaps().get("vi-insert")
     while (isGameOn.get) {
-      val c = reader.readBinding(km)
-      val k: Either[Operation, String] =
-        if (c == Operation.SELF_INSERT) Right(reader.getLastBinding)
-        else Left(c match { case op: Operation => op })
-      keyPressses.add(k)
+      blocking {
+        val c = reader.readBinding(km)
+        val k: Either[Operation, String] =
+          if (c == Operation.SELF_INSERT) Right(reader.getLastBinding)
+          else Left(c match { case op: Operation => op })
+        keyPressses.add(k)
+      }
     }
   }
 
+  // inside the main thread
   while (isGameOn.get) {
     while (!keyPressses.isEmpty) {
       Option(keyPressses.poll) foreach { k =>
@@ -40,7 +44,7 @@ object ConsoleGame extends App {
 
   def handleKeypress(k: Either[Operation, String], g: GameState): GameState =
     k match {
-      case Right("q") =>
+      case Right("q") | Left(Operation.VI_EOF_MAYBE) =>
         isGameOn.set(false)
         g
       // Left arrow
